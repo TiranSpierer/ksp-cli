@@ -2,11 +2,37 @@
 
 MCP server for [KSP](https://ksp.co.il) — Israel's electronics retailer. Search products and fetch product details straight from KSP's internal JSON API.
 
-#### Claude Code installation
+## Install
 
+<details>
+<summary>Claude Code</summary>
+
+Run in terminal:
 ```bash
 claude mcp add ksp -s user -- npx -y git+https://github.com/tiranspierer/ksp-mcp.git
 ```
+
+</details>
+
+<details>
+<summary>Codex</summary>
+
+Run in terminal:
+```bash
+codex mcp add ksp npx "-y" "git+https://github.com/tiranspierer/ksp-mcp.git"
+```
+
+</details>
+
+<details>
+<summary>Antigravity</summary>
+
+Run in terminal:
+```bash
+agy mcp add ksp -- npx -y git+https://github.com/tiranspierer/ksp-mcp.git
+```
+
+</details>
 
 <details>
 <summary>Manual MCP config</summary>
