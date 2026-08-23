@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-KSP MCP server (ksp.co.il). 4 tools over stdio, read-only. No auth — plain `fetch` with browser headers past Cloudflare.
+KSP MCP server and CLI (ksp.co.il). 4 read-only tools. No auth — plain `fetch` with browser headers past Cloudflare.
 
 ## Build & Test
 
@@ -21,6 +21,7 @@ ES Modules, TypeScript (ES2022, NodeNext). Output → `dist/`.
 - `schema.ts` — `stringArray()` zod preprocess (accepts array / JSON-string / bare string).
 - `tools/` — one file per tool, each exports a `ToolDefinition`. Registered in `tools/index.ts`.
 - `server.ts` — `createServer()`; registers tools, shared try/catch → `{ isError: true }`.
+- `cli.ts` + `cli-gen.ts` — `ksp-cli`, generated from the same `tools[]` schemas and handlers as MCP.
 - `format.ts` — `toYaml()`. All structured responses are YAML for token efficiency.
 
 ## Filtering model (get_filters + search_products `filters`)

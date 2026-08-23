@@ -53,6 +53,19 @@ agy mcp add ksp -- npx -y git+https://github.com/tiranspierer/ksp-mcp.git
 ---
 
 <details>
+<summary>CLI</summary>
+
+The package also provides `ksp-cli`, generated from the same tool schemas and handlers as the MCP server:
+
+```bash
+npx -y git+https://github.com/TiranSpierer/ksp-mcp.git ksp-cli --help
+ksp-cli search-products --query "laptop"
+ksp-cli get-product 407256 --include-specs
+```
+
+</details>
+
+<details>
 <summary>Tools</summary>
 
 - **`search_products`** — search by product name (Hebrew or English), or narrow by filters (brand, size, spec, price, …) to list the products in a category — one page, or every page in a single call. Returns names, prices, stock, and links.
