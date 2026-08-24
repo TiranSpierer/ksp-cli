@@ -20,7 +20,7 @@
   },
   "scripts": {
     "prebuild": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
-    "build": "node ./node_modules/typescript/bin/tsc && chmod +x dist/index.js dist/cli.js",
+    "build": "node ./node_modules/typescript/bin/tsc && node -e \"['dist/index.js','dist/cli.js'].forEach(f=>require('fs').chmodSync(f,0o755))\"",
     "reload": "npm run build && pkill -f 'node dist/index.js' || true",
     "prepare": "npm run build"
   },
