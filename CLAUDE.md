@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-KSP MCP server and CLI (ksp.co.il). 4 read-only tools. No auth — plain `fetch` with browser headers past Cloudflare.
+KSP MCP server and CLI (ksp.co.il). 4 read-only tools. No auth — requests go through a forged browser TLS/HTTP-2 fingerprint (cycletls) to clear Cloudflare.
 
 ## Build & Test
 
@@ -14,7 +14,7 @@ Then call `mcp__ksp-dev__*` tools directly to verify. The dev server is in `.mcp
 
 ES Modules, TypeScript (ES2022, NodeNext). Output → `dist/`.
 
-- `api/client.ts` — `kspFetch<T>()`, the single fetch choke point. Plain `fetch` to `https://ksp.co.il/m_action/api` with a realistic desktop-Chrome header set (Cloudflare keys on the UA; a stub UA gets the "Just a moment…" HTML). **Retries with exponential backoff + jitter** on 429/502/503/504, network/timeout errors, and Cloudflare-challenge HTML (honors `Retry-After`); 403/404/other 4xx fail fast. This is the one place backoff lives, so every call (search, filters, item, all-pages, images) is covered. `fetchBinary(url)` reuses the same headers/backoff for image bytes (the image CDN `img.ksp.co.il` is behind the same Cloudflare gate — a bare fetch gets 403; the browser UA unlocks it). Never call `fetch` directly elsewhere.
+- `api/client.ts` — `kspFetch<T>()`, the single fetch choke point. **Cloudflare fingerprints the TLS handshake + HTTP/2 settings (JA3/JA4 + Akamai), not just headers** — so Node's built-in `fetch` gets a 403 challenge no matter what headers it sends. We route every request through **cycletls**, which forges a real Chrome TLS + HTTP/2 fingerprint via a bundled Go helper (spawned lazily on a free port, reused, killed on exit via `closeClient()` + cycletls `autoExit`; the helper is a child process, so it dies with us). The forged fingerprint still gets challenged *probabilistically*, so a **403/Cloudflare-challenge HTML is treated as retryable** (not fail-fast) alongside 429/5xx/495/network errors, with exponential backoff + jitter and **profile rotation** (`PROFILES[]` — matched JA3/UA pairs) across attempts; 404 and other 4xx fail fast. This is the one place backoff/fingerprinting lives, so every call (search, filters, item, all-pages, images) is covered. `fetchBinary(url)` reuses the same fingerprint/backoff for image bytes (`img.ksp.co.il` is behind the same gate). Never call `fetch` directly elsewhere. To widen the fingerprint pool when Cloudflare sours on one, add a *tested* JA3/UA pair to `PROFILES`.
 - `api/ksp.ts` — `fetchCategory({query?, filters?, page?})`, `fetchCategoryAllPages()` (loops to `MAX_ALL_PAGES`=50), `getItem()`, and `itemImageUrls()` (largest size per image).
 - `types/ksp.ts` — lean interfaces for the fields we read (raw payloads are huge; we don't model all of it), including `KspFilterGroup`/`KspFilterOption`.
 - `text.ts` — `htmlToMarkdown()` (turndown; only for HTML fields), `extractUin()` (split-based, no regex), `shekel()`, `priceRangeLabel()` (guards the `{1,1}` placeholder KSP sends on result pages after page 1), `mergeFilterIds()` (split ids on `..`, dedupe, rejoin).
