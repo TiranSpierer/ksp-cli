@@ -4,6 +4,8 @@ MCP server for [KSP](https://ksp.co.il) — Israel's electronics retailer. Searc
 
 ## Install
 
+Recommended: install [`israel-shopping`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred over MCP for better token efficiency.
+
 <details>
 <summary>Claude Code</summary>
 
