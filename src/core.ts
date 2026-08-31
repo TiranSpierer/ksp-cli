@@ -206,6 +206,7 @@ export async function saveProductInfo(product: string, includeImages = false): P
 interface DiscountData {
   uin: string;
   price: string | null;
+  value: number;
   eilat_price?: string | null;
   about?: string;
 }
@@ -216,8 +217,26 @@ function activeDiscounts(item: KspItemResult): DiscountData[] {
     if (!discount || typeof discount !== "object") return [];
     const value = discount as Record<string, unknown>;
     if (value.value == null) return [];
-    return [{ uin, price: shekel(value.value), ...(value.value_eilat != null ? { eilat_price: shekel(value.value_eilat) } : {}), ...(typeof value.name === "string" ? { about: value.name } : {}) }];
+    return [{ uin, price: shekel(value.value), value: Number(value.value), ...(value.value_eilat != null ? { eilat_price: shekel(value.value_eilat) } : {}), ...(typeof value.name === "string" ? { about: value.name } : {}) }];
   });
+}
+
+function paymentData(item: KspItemResult, discount?: DiscountData): unknown {
+  const count = Number(item.payments?.max_wo);
+  const perPayment = Number(item.payments?.perPayment);
+  if (!Number.isFinite(count) || count < 1) return undefined;
+  if (!Number.isFinite(perPayment) || perPayment <= 0) return { max_without_interest: item.payments?.max_wo };
+  const total = count * perPayment;
+  const listPrice = Number(item.data?.price);
+  const closeTo = (price: number) => Number.isFinite(price) && Math.abs(total - price) <= count;
+  const priceBasis = discount && closeTo(discount.value)
+    ? "effective_price"
+    : closeTo(listPrice) ? "list_price" : "unknown";
+  return {
+    max_without_interest: item.payments?.max_wo,
+    per_payment: shekel(perPayment),
+    price_basis: priceBasis,
+  };
 }
 
 export function offerData(item: KspItemResult, requestedUin: string): Record<string, unknown> & { price: string | null; in_stock: boolean } {
@@ -226,6 +245,7 @@ export function offerData(item: KspItemResult, requestedUin: string): Record<str
   const stock = Array.isArray(item.stock) ? item.stock : item.stock && typeof item.stock === "object" ? Object.values(item.stock) : [];
   const discounts = activeDiscounts(item);
   const discount = discounts.find((entry) => entry.uin === uin) ?? (discounts.length === 1 ? discounts[0] : undefined);
+  const payments = paymentData(item, discount);
   const branches = stock.flatMap((branch) => branch?.name || branch?.title ? [branch.name ?? branch.title] : []);
   const delivery = (item.delivery ?? []).map((entry) => ({
     option: htmlToMarkdown(entry.title) || entry.type, price: shekel(entry.price) ?? "₪0",
@@ -239,10 +259,7 @@ export function offerData(item: KspItemResult, requestedUin: string): Record<str
     ...(discount?.eilat_price ? { eilat_price: discount.eilat_price, list_eilat_price: shekel(data.eilatPrice) } : data.eilatPrice ? { eilat_price: shekel(data.eilatPrice) } : {}),
     in_stock: Boolean(data.addToCart),
     branches,
-    ...(item.payments?.max_wo ? { payments: {
-      max_without_interest: item.payments.max_wo,
-      ...(item.payments.perPayment ? { per_payment: shekel(item.payments.perPayment) } : {}),
-    } } : {}),
+    ...(payments ? { payments } : {}),
     delivery,
     url: `${KSP_WEB}/item/${uin}`,
   };
@@ -282,8 +299,17 @@ export async function similarProducts(product: string): Promise<unknown> {
   const data = item.data ?? {};
   const similar = Array.isArray(item.similarItem) ? item.similarItem : item.similarItem ? [item.similarItem] : [];
   const complementary = Array.isArray(item.complementary_products) ? item.complementary_products : [];
-  return {
+  const recommendations = {
     uin: String(data.uin ?? requestedUin), name: data.name,
     similar: similar.map(relatedProduct), complementary: complementary.map(relatedProduct),
+  };
+  const path = join(productDirectory(String(data.uin ?? requestedUin)), "recommendations.yml");
+  await atomicWrite(path, toYaml(recommendations));
+  return {
+    uin: recommendations.uin,
+    name: recommendations.name,
+    similar: recommendations.similar.length,
+    complementary: recommendations.complementary.length,
+    file: path,
   };
 }

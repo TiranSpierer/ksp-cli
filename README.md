@@ -29,6 +29,8 @@ ksp-cli product similar 403899
 
 Search results label KSP's catalog value as `list_price`; use `product offer` or `product info` for an exact active sale price.
 
+`product similar` saves complete KSP recommendation lists to `recommendations.yml` and prints their counts and file path.
+
 `product info` creates a product bundle under `<os-temp>/ksp-cli/<uin>/`:
 
 ```text

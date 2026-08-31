@@ -54,8 +54,9 @@ export function buildProgram(): Command {
     .action((value: string) => output(productOffer(value)));
 
   product.command("similar")
-    .description("Show similar and complementary products suggested by KSP.")
+    .description("Save similar and complementary products suggested by KSP.")
     .argument("<product>", "product UIN or KSP URL")
+    .addHelpText("after", "\nSaves the complete KSP recommendation lists to recommendations.yml under the OS temporary directory.\n")
     .action((value: string) => output(similarProducts(value)));
   return program;
 }

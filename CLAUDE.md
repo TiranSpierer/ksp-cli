@@ -30,6 +30,7 @@ The core returns structured JavaScript values and throws errors. Commander and t
 - `data.price` is list price. A live sale price exists only when `bms[uin].discount.value` is present.
 - Category responses contain no exact sale value, so search labels prices explicitly as `list_price`.
 - Product stdout prefers the live sale price; `offer.yml` preserves list, sale, Eilat, payment, stock, and delivery data.
+- Saved payment data labels whether installments correspond to the effective price, list price, or an unknown KSP price basis.
 - `min_price` is the cheapest variation, not a discount.
 - KSP has regular and Eilat prices, not club prices.
 - Product HTML is converted with Turndown; do not hand-parse HTML.

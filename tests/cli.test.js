@@ -48,7 +48,26 @@ test("offer data prefers a real discount and preserves commercial details", () =
   assert.equal(offer.list_price, "₪167");
   assert.equal(offer.eilat_price, "₪118");
   assert.deepEqual(offer.branches, ["Branch"]);
-  assert.deepEqual(offer.payments, { max_without_interest: 1, per_payment: "₪139" });
+  assert.deepEqual(offer.payments, { max_without_interest: 1, per_payment: "₪139", price_basis: "effective_price" });
+});
+
+test("payment data labels installments based on list price", () => {
+  const offer = offerData({
+    data: { uin: 403291, price: 399, addToCart: true },
+    bms: { "403291": { discount: { value: 339 } } },
+    payments: { max_wo: 1, perPayment: 399 },
+  }, "403291");
+  assert.deepEqual(offer.payments, { max_without_interest: 1, per_payment: "₪399", price_basis: "list_price" });
+});
+
+test("payment data preserves an unknown upstream price basis", () => {
+  const offer = offerData({
+    data: { uin: 300112, price: 1599, eilatPrice: 1355, addToCart: true },
+    payments: { max_wo: 4, perPayment: 312 },
+  }, "300112");
+  assert.equal(offer.price, "₪1,599");
+  assert.equal(offer.eilat_price, "₪1,355");
+  assert.deepEqual(offer.payments, { max_without_interest: 4, per_payment: "₪312", price_basis: "unknown" });
 });
 
 test("HTML conversion removes known debris and bounds noisy image alt text", () => {
