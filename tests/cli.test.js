@@ -58,6 +58,7 @@ test("payment data labels installments based on list price", () => {
     payments: { max_wo: 1, perPayment: 399 },
   }, "403291");
   assert.deepEqual(offer.payments, { max_without_interest: 1, per_payment: "₪399", price_basis: "list_price" });
+  assert.equal(Object.hasOwn(offer, "list_eilat_price"), false);
 });
 
 test("payment data preserves an unknown upstream price basis", () => {

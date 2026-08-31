@@ -274,7 +274,10 @@ export function offerData(item: KspItemResult, requestedUin: string): Record<str
     name: htmlToMarkdown(data.name),
     price: discount?.price ?? shekel(data.price),
     ...(discount ? { list_price: shekel(data.price), discount_about: discount.about } : {}),
-    ...(discount?.eilat_price ? { eilat_price: discount.eilat_price, list_eilat_price: shekel(data.eilatPrice) } : data.eilatPrice ? { eilat_price: shekel(data.eilatPrice) } : {}),
+    ...(discount?.eilat_price ? {
+      eilat_price: discount.eilat_price,
+      ...(data.eilatPrice ? { list_eilat_price: shekel(data.eilatPrice) } : {}),
+    } : data.eilatPrice ? { eilat_price: shekel(data.eilatPrice) } : {}),
     in_stock: Boolean(data.addToCart),
     branches,
     ...(payments ? { payments } : {}),
