@@ -109,6 +109,15 @@ function resultFromRaw(raw: unknown): KspItemResult {
   return (raw as { result?: KspItemResult }).result ?? {};
 }
 
+const CATALOG_NUMBER_HEADINGS = new Set(["מק''ט", "מק'ט", 'מק"ט', "מק״ט"]);
+
+export function catalogNumber(item: KspItemResult): string | undefined {
+  const section = (item.specification?.items ?? []).find((candidate) =>
+    CATALOG_NUMBER_HEADINGS.has(htmlToMarkdown(candidate.head).trim()),
+  );
+  return section ? htmlToMarkdown(section.body).trim() || undefined : undefined;
+}
+
 const IMAGE_EXTENSIONS: Record<string, string> = {
   "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/avif": ".avif", "image/gif": ".gif",
 };
@@ -134,6 +143,15 @@ export async function saveProductInfo(product: string, includeImages = false): P
   const item = resultFromRaw(raw);
   const data = item.data ?? {};
   const uin = String(data.uin ?? requestedUin);
+  const model = item.specification?.modalName || undefined;
+  const catalog = catalogNumber(item);
+  const identity = {
+    uin,
+    name: data.name,
+    ...(data.brandName ? { brand: data.brandName } : {}),
+    ...(model ? { model } : {}),
+    ...(catalog ? { catalog_number: catalog } : {}),
+  };
   const directory = productDirectory(uin);
   const sections = item.specification?.items ?? [];
   const isMarketing = (section: { head?: string }) => htmlToMarkdown(section.head).trim() === "סקירה";
@@ -145,7 +163,7 @@ export async function saveProductInfo(product: string, includeImages = false): P
   };
   await Promise.all([
     atomicWrite(paths.product, toYaml({
-      uin, name: data.name, model: item.specification?.modalName, brand: data.brandName,
+      ...identity,
       description: data.smalldesc ? htmlToMarkdown(data.smalldesc) : undefined,
       variations: variations(item), url: `${KSP_WEB}/item/${uin}`,
     })),
@@ -160,7 +178,7 @@ export async function saveProductInfo(product: string, includeImages = false): P
     files.images = imageResult.directory;
   }
   return {
-    uin, name: data.name, brand: data.brandName, model: item.specification?.modalName,
+    ...identity,
     price: shekel(data.price), in_stock: Boolean(data.addToCart), files,
     ...(imageResult ? { images_downloaded: imageResult.count, ...(imageResult.failed ? { images_failed: imageResult.failed } : {}) } : {}),
   };

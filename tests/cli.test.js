@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { catalogNumber } from "../dist/core.js";
 import { mergeFilterIds, priceRangeLabel } from "../dist/text.js";
 
 function cli(...args) {
@@ -31,4 +32,15 @@ test("filter paths merge repeated prefixed IDs", () => {
 test("placeholder price ranges are omitted", () => {
   assert.equal(priceRangeLabel(1, 1), null);
   assert.equal(priceRangeLabel(5269, 5269), "₪5,269");
+});
+
+test("catalog number is read without treating it as a model field", () => {
+  const item = {
+    specification: {
+      modalName: null,
+      items: [{ head: "מק''ט", body: "<p>MS23K3555EK </p>" }],
+    },
+  };
+  assert.equal(catalogNumber(item), "MS23K3555EK");
+  assert.equal(item.specification.modalName, null);
 });
