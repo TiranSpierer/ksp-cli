@@ -25,7 +25,7 @@ ksp-cli product offer 403899
 ksp-cli product similar 403899
 ```
 
-`search --list-filters` returns KSP's current filter groups and opaque option IDs. Pass selected IDs back with repeatable `--filter` options. Filter IDs are contextual: apply a category, list filters again, and then choose refinements. IDs are never hardcoded by the CLI.
+`search --list-filters` saves KSP's current filter groups and opaque option IDs to `<os-temp>/ksp-cli/searches/<hash>/filters.yml` and prints a compact group index and path. Pass selected IDs back with repeatable `--filter` options. Filter IDs are contextual: apply a category, list filters again, and then choose refinements. IDs are never hardcoded by the CLI.
 
 Search results label KSP's catalog value as `list_price`; use `product offer` or `product info` for an exact active sale price.
 Single-page searches label KSP's aggregate range as `reported_list_price_range`; all-pages computes `list_price_range` from the unique products fetched.

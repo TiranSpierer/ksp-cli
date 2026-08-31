@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fetchBinary, KSP_WEB } from "./api/client.js";
 import { fetchCategory, fetchCategoryAllPages, getItem, getItemRaw, itemImageUrls, MAX_ALL_PAGES } from "./api/ksp.js";
-import { atomicWrite, productDirectory } from "./files.js";
+import { atomicWrite, productDirectory, searchDirectory } from "./files.js";
 import { toYaml } from "./format.js";
 import { extractUin, htmlToMarkdown, mergeFilterIds, priceRangeLabel, shekel } from "./text.js";
 import type { KspItemResult, KspSearchItem } from "./types/ksp.js";
@@ -22,23 +22,40 @@ function requireSearch(input: SearchInput): string {
   return filters;
 }
 
-function filtersOutput(result: Awaited<ReturnType<typeof fetchCategory>>, applied?: string): unknown {
+interface FilterGroupOutput {
+  group?: string;
+  showing?: string;
+  options: Array<{ name?: string; id?: string; reported_count?: number }>;
+}
+
+async function filtersOutput(result: Awaited<ReturnType<typeof fetchCategory>>, query?: string, applied?: string): Promise<unknown> {
   const groups = Object.values(result.filter ?? {}).flatMap((group) => {
     const options = Object.values(group.tags ?? {}).filter((option) => option.action).map((option) => ({
-      name: option.name, id: option.action, reported_count: option.products_count,
+      name: htmlToMarkdown(option.name), id: option.action, reported_count: option.products_count,
     }));
     if (!options.length) return [];
-    const value: Record<string, unknown> = { group: group.catName };
+    const value: FilterGroupOutput = { group: htmlToMarkdown(group.catName), options };
     const total = group.total ?? options.length;
     if (total > options.length) value.showing = `${options.length} of ${total} (top by relevance)`;
-    value.options = options;
     return [value];
   });
-  return { total: result.products_total, ...(applied ? { applied_filters: applied } : {}), filter_groups: groups };
+  const full = { total: result.products_total, ...(applied ? { applied_filters: applied } : {}), filter_groups: groups };
+  const path = join(searchDirectory(JSON.stringify([query ?? "", applied ?? ""])), "filters.yml");
+  await atomicWrite(path, toYaml(full));
+  return {
+    total: result.products_total,
+    ...(applied ? { applied_filters: applied } : {}),
+    filter_groups: groups.map((group) => ({
+      group: group.group,
+      options: group.options.length,
+      ...(group.showing ? { showing: group.showing } : {}),
+    })),
+    file: path,
+  };
 }
 
 function productCard(item: KspSearchItem, details = false): unknown {
-  const value: Record<string, unknown> = { uin: item.uin, name: item.name, list_price: shekel(item.price) };
+  const value: Record<string, unknown> = { uin: item.uin, name: htmlToMarkdown(item.name), list_price: shekel(item.price) };
   const eilat = item.eilatPrice || item.min_eilat_price;
   if (eilat) value.eilat_price = shekel(eilat);
   if (item.brandName) value.brand = item.brandName;
@@ -65,7 +82,7 @@ export function uniqueSearchItems(items: KspSearchItem[]): KspSearchItem[] {
 export async function searchProducts(input: SearchInput): Promise<unknown> {
   const filters = requireSearch(input);
   if (input.listFilters) {
-    return filtersOutput(await fetchCategory({ query: input.query, filters: filters || undefined }), filters || undefined);
+    return filtersOutput(await fetchCategory({ query: input.query, filters: filters || undefined }), input.query, filters || undefined);
   }
   if (input.allPages) {
     const result = await fetchCategoryAllPages({ query: input.query, filters: filters || undefined });
@@ -158,11 +175,12 @@ export async function saveProductInfo(product: string, includeImages = false): P
   const item = resultFromRaw(raw);
   const data = item.data ?? {};
   const uin = String(data.uin ?? requestedUin);
-  const model = item.specification?.modalName || undefined;
+  const rawModel = htmlToMarkdown(item.specification?.modalName).trim();
+  const model = rawModel && rawModel !== "-" ? rawModel : undefined;
   const catalog = catalogNumber(item);
   const identity = {
     uin,
-    name: data.name,
+    name: htmlToMarkdown(data.name),
     ...(data.brandName ? { brand: data.brandName } : {}),
     ...(model ? { model } : {}),
     ...(catalog ? { catalog_number: catalog } : {}),
@@ -186,8 +204,8 @@ export async function saveProductInfo(product: string, includeImages = false): P
       ...(productVariations.length ? { variations: productVariations } : {}), url: `${KSP_WEB}/item/${uin}`,
     })),
     atomicWrite(paths.offer, toYaml(offer)),
-    atomicWrite(paths.specifications, markdown(`${data.name ?? uin} — specifications`, sections.filter((section) => !isMarketing(section)))),
-    atomicWrite(paths.marketing, markdown(`${data.name ?? uin} — marketing`, sections.filter(isMarketing))),
+    atomicWrite(paths.specifications, markdown(`${htmlToMarkdown(data.name) || uin} — specifications`, sections.filter((section) => !isMarketing(section)))),
+    atomicWrite(paths.marketing, markdown(`${htmlToMarkdown(data.name) || uin} — marketing`, sections.filter(isMarketing))),
     atomicWrite(paths.raw, `${JSON.stringify(raw, null, 2)}\n`),
   ]);
   let imageResult: Awaited<ReturnType<typeof downloadImages>> | undefined;
@@ -253,7 +271,7 @@ export function offerData(item: KspItemResult, requestedUin: string): Record<str
   }));
   return {
     uin,
-    name: data.name,
+    name: htmlToMarkdown(data.name),
     price: discount?.price ?? shekel(data.price),
     ...(discount ? { list_price: shekel(data.price), discount_about: discount.about } : {}),
     ...(discount?.eilat_price ? { eilat_price: discount.eilat_price, list_eilat_price: shekel(data.eilatPrice) } : data.eilatPrice ? { eilat_price: shekel(data.eilatPrice) } : {}),
@@ -290,7 +308,7 @@ export async function productOffer(product: string): Promise<unknown> {
 function relatedProduct(product: unknown): unknown {
   if (!product || typeof product !== "object") return product;
   const value = product as Record<string, unknown>;
-  return { uin: value.uin, name: value.name, list_price: shekel(value.price ?? value.min_price), ...(value.uin ? { url: `${KSP_WEB}/item/${value.uin}` } : {}) };
+  return { uin: value.uin, name: htmlToMarkdown(value.name), list_price: shekel(value.price ?? value.min_price), ...(value.uin ? { url: `${KSP_WEB}/item/${value.uin}` } : {}) };
 }
 
 export async function similarProducts(product: string): Promise<unknown> {
@@ -300,7 +318,7 @@ export async function similarProducts(product: string): Promise<unknown> {
   const similar = Array.isArray(item.similarItem) ? item.similarItem : item.similarItem ? [item.similarItem] : [];
   const complementary = Array.isArray(item.complementary_products) ? item.complementary_products : [];
   const recommendations = {
-    uin: String(data.uin ?? requestedUin), name: data.name,
+    uin: String(data.uin ?? requestedUin), name: htmlToMarkdown(data.name),
     similar: similar.map(relatedProduct), complementary: complementary.map(relatedProduct),
   };
   const path = join(productDirectory(String(data.uin ?? requestedUin)), "recommendations.yml");

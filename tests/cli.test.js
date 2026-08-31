@@ -73,6 +73,8 @@ test("payment data preserves an unknown upstream price basis", () => {
 test("HTML conversion removes known debris and bounds noisy image alt text", () => {
   assert.equal(htmlToMarkdown("<br>Useful description"), "Useful description");
   assert.equal(htmlToMarkdown("<p>Useful.'></p>"), "Useful.");
+  assert.equal(htmlToMarkdown("31 אינץ&apos;"), "31 אינץ'");
+  assert.equal(htmlToMarkdown("Fan< / red> - silver"), "Fan - silver");
   const noisy = "x".repeat(121);
   assert.equal(htmlToMarkdown(`<img src="https://example.com/a.jpg" alt="${noisy}">`), "![Product image](https://example.com/a.jpg)");
   assert.equal(htmlToMarkdown("<div>'>'></div>"), "");

@@ -26,6 +26,7 @@ The core returns structured JavaScript values and throws errors. Commander and t
 
 - Filter IDs come from the live category response. Never hardcode them.
 - Filter IDs are contextual. Apply the category path and fetch its filters before selecting refinements.
+- Full filter trees are saved under the OS temporary directory; stdout contains a compact group index and path.
 - Filter IDs share category prefixes; `mergeFilterIds()` de-duplicates their `..` path segments.
 - `data.price` is list price. A live sale price exists only when `bms[uin].discount.value` is present.
 - Category responses contain no exact sale value, so search labels prices explicitly as `list_price`.

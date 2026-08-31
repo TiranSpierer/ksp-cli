@@ -32,8 +32,8 @@ export function buildProgram(): Command {
     .option("--page <number>", "result page", positive, 1)
     .option("--all-pages", "fetch every result page, up to 50 pages")
     .option("--details", "include descriptions and thumbnails")
-    .option("--list-filters", "list the currently available filter groups and IDs instead of products")
-    .addHelpText("after", "\nSearch results contain KSP list prices. Use product offer for an exact active sale price.\nFilter IDs are contextual. After applying a category filter, run --list-filters again before choosing further refinements.\n")
+    .option("--list-filters", "save available filter groups and IDs and print a compact index")
+    .addHelpText("after", "\nSearch results contain KSP list prices. Use product offer for an exact active sale price.\nFull filter options are saved to filters.yml under the OS temporary directory. Filter IDs are contextual: after applying a category filter, run --list-filters again before choosing refinements.\n")
     .action((query: string | undefined, options) => output(searchProducts({
       query, filters: options.filter, page: options.page, allPages: Boolean(options.allPages),
       details: Boolean(options.details), listFilters: Boolean(options.listFilters),

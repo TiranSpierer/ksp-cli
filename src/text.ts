@@ -35,13 +35,32 @@ function cleanMarkdown(value: string): string {
     .trim();
 }
 
+function removeMalformedClosingTags(value: string): string {
+  let remaining = value;
+  let result = "";
+  while (true) {
+    const open = remaining.indexOf("<");
+    if (open < 0) return result + remaining;
+    const close = remaining.indexOf(">", open + 1);
+    if (close < 0) return result + remaining;
+    result += remaining.slice(0, open);
+    const inside = remaining.slice(open + 1, close).trimStart();
+    if (inside.startsWith("/ ")) {
+      remaining = remaining.slice(close + 1);
+    } else {
+      result += remaining.slice(open, close + 1);
+      remaining = remaining.slice(close + 1);
+    }
+  }
+}
+
 /** Convert an HTML fragment to trimmed Markdown. Empty in -> empty out. */
 export function htmlToMarkdown(html: unknown): string {
   if (html === null || html === undefined) return "";
-  const s = String(html).trim();
+  const s = removeMalformedClosingTags(String(html).trim());
   if (!s) return "";
   // No angle brackets => not HTML, return as-is (avoids needless processing).
-  if (!s.includes("<")) return s;
+  if (!s.includes("<") && !s.includes("&")) return s;
   try {
     return cleanMarkdown(turndown.turndown(s));
   } catch {
