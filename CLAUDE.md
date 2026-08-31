@@ -28,6 +28,7 @@ The core returns structured JavaScript values and throws errors. Commander and t
 - Filter IDs are contextual. Apply the category path and fetch its filters before selecting refinements.
 - Filter IDs share category prefixes; `mergeFilterIds()` de-duplicates their `..` path segments.
 - `data.price` is list price. A live sale price exists only when `bms[uin].discount.value` is present.
+- Category responses contain no exact sale value, so search labels prices explicitly as `list_price`.
 - Product stdout prefers the live sale price; `offer.yml` preserves list, sale, Eilat, payment, stock, and delivery data.
 - `min_price` is the cheapest variation, not a discount.
 - KSP has regular and Eilat prices, not club prices.

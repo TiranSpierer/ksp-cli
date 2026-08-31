@@ -27,6 +27,8 @@ ksp-cli product similar 403899
 
 `search --list-filters` returns KSP's current filter groups and opaque option IDs. Pass selected IDs back with repeatable `--filter` options. Filter IDs are contextual: apply a category, list filters again, and then choose refinements. IDs are never hardcoded by the CLI.
 
+Search results label KSP's catalog value as `list_price`; use `product offer` or `product info` for an exact active sale price.
+
 `product info` creates a product bundle under `<os-temp>/ksp-cli/<uin>/`:
 
 ```text

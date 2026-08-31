@@ -38,7 +38,7 @@ function filtersOutput(result: Awaited<ReturnType<typeof fetchCategory>>, applie
 }
 
 function productCard(item: KspSearchItem, details = false): unknown {
-  const value: Record<string, unknown> = { uin: item.uin, name: item.name, price: shekel(item.price) };
+  const value: Record<string, unknown> = { uin: item.uin, name: item.name, list_price: shekel(item.price) };
   const eilat = item.eilatPrice || item.min_eilat_price;
   if (eilat) value.eilat_price = shekel(eilat);
   if (item.brandName) value.brand = item.brandName;
@@ -77,7 +77,7 @@ export async function searchProducts(input: SearchInput): Promise<unknown> {
     return {
       total: result.total ?? 0,
       ...(filters ? { applied_filters: filters } : {}),
-      ...(prices.length ? { price_range: priceRangeLabel(Math.min(...prices), Math.max(...prices)) } : {}),
+      ...(prices.length ? { list_price_range: priceRangeLabel(Math.min(...prices), Math.max(...prices)) } : {}),
       fetched: items.length,
       ...(duplicateCount ? { duplicates_removed: duplicateCount } : {}),
       ...(incomplete ? { complete: false } : {}),
@@ -90,7 +90,7 @@ export async function searchProducts(input: SearchInput): Promise<unknown> {
   return {
     total: result.products_total ?? 0,
     ...(filters ? { applied_filters: filters } : {}),
-    ...(range ? { price_range: range } : {}),
+    ...(range ? { list_price_range: range } : {}),
     ...(result.next ? { next_page: result.next } : {}),
     products: uniqueSearchItems(result.items ?? []).map((item) => productCard(item, input.details)),
   };
@@ -103,7 +103,7 @@ export function variationData(item: KspItemResult): unknown[] {
   const result = (item.products_options?.variations ?? []).map((variation) => ({
     label: Object.values(variation.tags ?? {}).map((id) => names[String(id)] ?? String(id)).join(", "),
     uin: variation.data?.uin_item,
-    price: shekel(variation.data?.price),
+    list_price: shekel(variation.data?.price),
   }));
   const currentUin = String(item.data?.uin ?? "");
   if (result.length === 1 && !result[0].label && String(result[0].uin ?? "") === currentUin) return [];
@@ -273,7 +273,7 @@ export async function productOffer(product: string): Promise<unknown> {
 function relatedProduct(product: unknown): unknown {
   if (!product || typeof product !== "object") return product;
   const value = product as Record<string, unknown>;
-  return { uin: value.uin, name: value.name, price: shekel(value.price ?? value.min_price), ...(value.uin ? { url: `${KSP_WEB}/item/${value.uin}` } : {}) };
+  return { uin: value.uin, name: value.name, list_price: shekel(value.price ?? value.min_price), ...(value.uin ? { url: `${KSP_WEB}/item/${value.uin}` } : {}) };
 }
 
 export async function similarProducts(product: string): Promise<unknown> {

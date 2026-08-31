@@ -26,9 +26,10 @@ function cleanMarkdown(value: string): string {
     .split("\n")
     .map((line) => {
       const trimmed = line.trim();
-      if (trimmed === "'>" || trimmed === '\">') return "";
-      const end = line.trimEnd();
-      return end.endsWith(".'>") ? end.slice(0, -2) : line;
+      if (trimmed.includes(">") && [...trimmed].every((char) => char === "'" || char === '\"' || char === ">")) return "";
+      let end = line.trimEnd();
+      while (end.endsWith("'>") || end.endsWith('\">')) end = end.slice(0, -2);
+      return end;
     })
     .join("\n")
     .trim();

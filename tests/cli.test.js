@@ -56,6 +56,7 @@ test("HTML conversion removes known debris and bounds noisy image alt text", () 
   assert.equal(htmlToMarkdown("<p>Useful.'></p>"), "Useful.");
   const noisy = "x".repeat(121);
   assert.equal(htmlToMarkdown(`<img src="https://example.com/a.jpg" alt="${noisy}">`), "![Product image](https://example.com/a.jpg)");
+  assert.equal(htmlToMarkdown("<div>'>'></div>"), "");
 });
 
 test("filter paths merge repeated prefixed IDs", () => {
