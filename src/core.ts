@@ -25,7 +25,7 @@ function requireSearch(input: SearchInput): string {
 function filtersOutput(result: Awaited<ReturnType<typeof fetchCategory>>, applied?: string): unknown {
   const groups = Object.values(result.filter ?? {}).flatMap((group) => {
     const options = Object.values(group.tags ?? {}).filter((option) => option.action).map((option) => ({
-      name: option.name, id: option.action, count: option.products_count,
+      name: option.name, id: option.action, reported_count: option.products_count,
     }));
     if (!options.length) return [];
     const value: Record<string, unknown> = { group: group.catName };
@@ -46,14 +46,20 @@ function productCard(item: KspSearchItem, details = false): unknown {
   const labels = (item.labels ?? []).flatMap((label) => label?.msg ? [label.msg] : []);
   if (labels.length) value.labels = labels;
   if (details) {
-    if (item.description) value.description = item.description;
+    if (item.description) value.description = htmlToMarkdown(item.description);
     if (item.img) value.thumbnail = item.img;
-    if (item.payments?.max_num_payments_wo_interest) {
-      value.payments = `up to ${item.payments.max_num_payments_wo_interest} interest-free${item.payments.estimated_payment ? ` (₪${item.payments.estimated_payment}/mo)` : ""}`;
-    }
   }
   value.url = `${KSP_WEB}/item/${item.uin}`;
   return value;
+}
+
+export function uniqueSearchItems(items: KspSearchItem[]): KspSearchItem[] {
+  const unique = new Map<string, KspSearchItem>();
+  for (const item of items) {
+    const key = String(item.uin);
+    if (!unique.has(key)) unique.set(key, item);
+  }
+  return [...unique.values()];
 }
 
 export async function searchProducts(input: SearchInput): Promise<unknown> {
@@ -63,14 +69,20 @@ export async function searchProducts(input: SearchInput): Promise<unknown> {
   }
   if (input.allPages) {
     const result = await fetchCategoryAllPages({ query: input.query, filters: filters || undefined });
-    const prices = result.items.map((item) => Number(item.price)).filter((price) => price > 0);
+    const items = uniqueSearchItems(result.items);
+    const duplicateCount = result.items.length - items.length;
+    const total = Number(result.total);
+    const incomplete = result.capped || (Number.isFinite(total) && items.length < total);
+    const prices = items.map((item) => Number(item.price)).filter((price) => price > 0);
     return {
       total: result.total ?? 0,
       ...(filters ? { applied_filters: filters } : {}),
       ...(prices.length ? { price_range: priceRangeLabel(Math.min(...prices), Math.max(...prices)) } : {}),
-      fetched: result.items.length,
+      fetched: items.length,
+      ...(duplicateCount ? { duplicates_removed: duplicateCount } : {}),
+      ...(incomplete ? { complete: false } : {}),
       ...(result.capped ? { note: `Stopped at ${MAX_ALL_PAGES} pages; narrow the search to fetch the remaining products.` } : {}),
-      products: result.items.map((item) => productCard(item, input.details)),
+      products: items.map((item) => productCard(item, input.details)),
     };
   }
   const result = await fetchCategory({ query: input.query, filters: filters || undefined, page: input.page ?? 1 });
@@ -80,19 +92,22 @@ export async function searchProducts(input: SearchInput): Promise<unknown> {
     ...(filters ? { applied_filters: filters } : {}),
     ...(range ? { price_range: range } : {}),
     ...(result.next ? { next_page: result.next } : {}),
-    products: (result.items ?? []).map((item) => productCard(item, input.details)),
+    products: uniqueSearchItems(result.items ?? []).map((item) => productCard(item, input.details)),
   };
 }
 
-function variations(item: KspItemResult): unknown[] {
+export function variationData(item: KspItemResult): unknown[] {
   const names = Object.fromEntries(Object.values(item.products_options?.render?.tags ?? {}).flatMap((axis) =>
     (axis.items ?? []).map((option) => [String(option.id), option.name]),
   ));
-  return (item.products_options?.variations ?? []).map((variation) => ({
+  const result = (item.products_options?.variations ?? []).map((variation) => ({
     label: Object.values(variation.tags ?? {}).map((id) => names[String(id)] ?? String(id)).join(", "),
     uin: variation.data?.uin_item,
     price: shekel(variation.data?.price),
   }));
+  const currentUin = String(item.data?.uin ?? "");
+  if (result.length === 1 && !result[0].label && String(result[0].uin ?? "") === currentUin) return [];
+  return result;
 }
 
 function markdown(title: string, sections: Array<{ head?: string; body?: string }>): string {
@@ -154,9 +169,12 @@ export async function saveProductInfo(product: string, includeImages = false): P
   };
   const directory = productDirectory(uin);
   const sections = item.specification?.items ?? [];
+  const productVariations = variationData(item);
+  const offer = offerData(item, uin);
   const isMarketing = (section: { head?: string }) => htmlToMarkdown(section.head).trim() === "סקירה";
   const paths = {
     product: join(directory, "product.yml"),
+    offer: join(directory, "offer.yml"),
     specifications: join(directory, "specifications.md"),
     marketing: join(directory, "marketing.md"),
     raw: join(directory, "raw.json"),
@@ -165,8 +183,9 @@ export async function saveProductInfo(product: string, includeImages = false): P
     atomicWrite(paths.product, toYaml({
       ...identity,
       description: data.smalldesc ? htmlToMarkdown(data.smalldesc) : undefined,
-      variations: variations(item), url: `${KSP_WEB}/item/${uin}`,
+      ...(productVariations.length ? { variations: productVariations } : {}), url: `${KSP_WEB}/item/${uin}`,
     })),
+    atomicWrite(paths.offer, toYaml(offer)),
     atomicWrite(paths.specifications, markdown(`${data.name ?? uin} — specifications`, sections.filter((section) => !isMarketing(section)))),
     atomicWrite(paths.marketing, markdown(`${data.name ?? uin} — marketing`, sections.filter(isMarketing))),
     atomicWrite(paths.raw, `${JSON.stringify(raw, null, 2)}\n`),
@@ -179,12 +198,19 @@ export async function saveProductInfo(product: string, includeImages = false): P
   }
   return {
     ...identity,
-    price: shekel(data.price), in_stock: Boolean(data.addToCart), files,
+    price: offer.price, in_stock: offer.in_stock, files,
     ...(imageResult ? { images_downloaded: imageResult.count, ...(imageResult.failed ? { images_failed: imageResult.failed } : {}) } : {}),
   };
 }
 
-function activeDiscounts(item: KspItemResult): unknown[] {
+interface DiscountData {
+  uin: string;
+  price: string | null;
+  eilat_price?: string | null;
+  about?: string;
+}
+
+function activeDiscounts(item: KspItemResult): DiscountData[] {
   return Object.entries(item.bms ?? {}).flatMap(([uin, entry]) => {
     const discount = entry && typeof entry === "object" ? (entry as Record<string, unknown>).discount : undefined;
     if (!discount || typeof discount !== "object") return [];
@@ -194,27 +220,54 @@ function activeDiscounts(item: KspItemResult): unknown[] {
   });
 }
 
-export async function productOffer(product: string): Promise<unknown> {
-  const requestedUin = extractUin(product);
-  const item = await getItem(requestedUin);
+export function offerData(item: KspItemResult, requestedUin: string): Record<string, unknown> & { price: string | null; in_stock: boolean } {
   const data = item.data ?? {};
   const uin = String(data.uin ?? requestedUin);
   const stock = Array.isArray(item.stock) ? item.stock : item.stock && typeof item.stock === "object" ? Object.values(item.stock) : [];
-  const output: Record<string, unknown> = {
-    uin, name: data.name, price: shekel(data.price),
-    ...(data.eilatPrice ? { eilat_price: shekel(data.eilatPrice) } : {}), in_stock: Boolean(data.addToCart),
-  };
   const discounts = activeDiscounts(item);
-  if (discounts.length) output.discount = discounts.length === 1 ? discounts[0] : discounts;
+  const discount = discounts.find((entry) => entry.uin === uin) ?? (discounts.length === 1 ? discounts[0] : undefined);
   const branches = stock.flatMap((branch) => branch?.name || branch?.title ? [branch.name ?? branch.title] : []);
-  if (branches.length) output.branches = branches;
-  if (item.payments?.max_wo) output.payments = `up to ${item.payments.max_wo} interest-free${item.payments.perPayment ? ` (₪${item.payments.perPayment}/mo)` : ""}`;
-  if (item.delivery?.length) output.delivery = item.delivery.map((delivery) => ({
-    option: htmlToMarkdown(delivery.title) || delivery.type, price: shekel(delivery.price) ?? "₪0",
-    ...(delivery.time ? { eta_days: `${delivery.time.min}–${delivery.time.max}` } : {}),
+  const delivery = (item.delivery ?? []).map((entry) => ({
+    option: htmlToMarkdown(entry.title) || entry.type, price: shekel(entry.price) ?? "₪0",
+    ...(entry.time ? { eta_days: `${entry.time.min}–${entry.time.max}` } : {}),
   }));
-  output.url = `${KSP_WEB}/item/${uin}`;
-  return output;
+  return {
+    uin,
+    name: data.name,
+    price: discount?.price ?? shekel(data.price),
+    ...(discount ? { list_price: shekel(data.price), discount_about: discount.about } : {}),
+    ...(discount?.eilat_price ? { eilat_price: discount.eilat_price, list_eilat_price: shekel(data.eilatPrice) } : data.eilatPrice ? { eilat_price: shekel(data.eilatPrice) } : {}),
+    in_stock: Boolean(data.addToCart),
+    branches,
+    ...(item.payments?.max_wo ? { payments: {
+      max_without_interest: item.payments.max_wo,
+      ...(item.payments.perPayment ? { per_payment: shekel(item.payments.perPayment) } : {}),
+    } } : {}),
+    delivery,
+    url: `${KSP_WEB}/item/${uin}`,
+  };
+}
+
+function offerSummary(offer: Record<string, unknown> & { price: string | null; in_stock: boolean }, path: string): unknown {
+  const branches = Array.isArray(offer.branches) ? offer.branches : [];
+  return {
+    uin: offer.uin,
+    name: offer.name,
+    price: offer.price,
+    in_stock: offer.in_stock,
+    ...(branches.length ? { available_branches: branches.length } : {}),
+    file: path,
+  };
+}
+
+export async function productOffer(product: string): Promise<unknown> {
+  const requestedUin = extractUin(product);
+  const item = await getItem(requestedUin);
+  const uin = String(item.data?.uin ?? requestedUin);
+  const offer = offerData(item, uin);
+  const path = join(productDirectory(uin), "offer.yml");
+  await atomicWrite(path, toYaml(offer));
+  return offerSummary(offer, path);
 }
 
 function relatedProduct(product: unknown): unknown {

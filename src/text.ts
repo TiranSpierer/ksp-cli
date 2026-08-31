@@ -11,6 +11,29 @@ const turndown = new TurndownService({
   codeBlockStyle: "fenced",
 });
 
+turndown.addRule("readableImages", {
+  filter: "img",
+  replacement: (_content, node) => {
+    const image = node as unknown as { getAttribute: (name: string) => string | null };
+    const src = image.getAttribute("src")?.trim();
+    if (!src) return "";
+    return `![Product image](${src})`;
+  },
+});
+
+function cleanMarkdown(value: string): string {
+  return value
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (trimmed === "'>" || trimmed === '\">') return "";
+      const end = line.trimEnd();
+      return end.endsWith(".'>") ? end.slice(0, -2) : line;
+    })
+    .join("\n")
+    .trim();
+}
+
 /** Convert an HTML fragment to trimmed Markdown. Empty in -> empty out. */
 export function htmlToMarkdown(html: unknown): string {
   if (html === null || html === undefined) return "";
@@ -19,7 +42,7 @@ export function htmlToMarkdown(html: unknown): string {
   // No angle brackets => not HTML, return as-is (avoids needless processing).
   if (!s.includes("<")) return s;
   try {
-    return turndown.turndown(s).trim();
+    return cleanMarkdown(turndown.turndown(s));
   } catch {
     return s;
   }

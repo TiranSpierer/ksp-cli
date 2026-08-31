@@ -28,11 +28,12 @@ export function buildProgram(): Command {
   program.command("search")
     .description("Search KSP's product catalog by text, live filter IDs, or both.")
     .argument("[query]", "product search text in Hebrew or English")
-    .option("--filter <id>", "apply a filter ID returned by --list-filters; repeatable", collect, [])
+    .option("--filter <id>", "apply a contextual filter ID returned by --list-filters; repeatable", collect, [])
     .option("--page <number>", "result page", positive, 1)
     .option("--all-pages", "fetch every result page, up to 50 pages")
-    .option("--details", "include descriptions, thumbnails, and payment details")
+    .option("--details", "include descriptions and thumbnails")
     .option("--list-filters", "list the currently available filter groups and IDs instead of products")
+    .addHelpText("after", "\nFilter IDs are contextual. After applying a category filter, run --list-filters again before choosing further refinements.\n")
     .action((query: string | undefined, options) => output(searchProducts({
       query, filters: options.filter, page: options.page, allPages: Boolean(options.allPages),
       details: Boolean(options.details), listFilters: Boolean(options.listFilters),
@@ -43,12 +44,13 @@ export function buildProgram(): Command {
     .description("Save detailed product information and specifications.")
     .argument("<product>", "product UIN or KSP URL")
     .option("--include-images", "download all product images")
-    .addHelpText("after", "\nCreates these files under the OS temporary directory:\n\n  product.yml       Product identity, description, and variations\n  specifications.md Structured specifications supplied by KSP\n  marketing.md      KSP/importer presentation with additional product details\n  raw.json          Complete untouched response from KSP's product API\n  images/           Product images; created only with --include-images\n")
+    .addHelpText("after", "\nCreates these files under the OS temporary directory:\n\n  product.yml       Product identity, description, and variations\n  offer.yml         KSP prices, payments, branch stock, and delivery\n  specifications.md Structured specifications supplied by KSP\n  marketing.md      KSP/importer presentation with additional product details\n  raw.json          Complete untouched response from KSP's product API\n  images/           Product images; created only with --include-images\n")
     .action((value: string, options) => output(saveProductInfo(value, Boolean(options.includeImages))));
 
   product.command("offer")
-    .description("Show KSP's current pricing, availability, payments, and delivery.")
+    .description("Show KSP's effective price and availability and save full offer details.")
     .argument("<product>", "product UIN or KSP URL")
+    .addHelpText("after", "\nSaves list, sale and Eilat prices, payments, branch stock, and delivery to offer.yml under the OS temporary directory.\n")
     .action((value: string) => output(productOffer(value)));
 
   product.command("similar")

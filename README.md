@@ -25,12 +25,13 @@ ksp-cli product offer 403899
 ksp-cli product similar 403899
 ```
 
-`search --list-filters` returns KSP's current filter groups and opaque option IDs. Pass selected IDs back with repeatable `--filter` options. IDs are never hardcoded by the CLI.
+`search --list-filters` returns KSP's current filter groups and opaque option IDs. Pass selected IDs back with repeatable `--filter` options. Filter IDs are contextual: apply a category, list filters again, and then choose refinements. IDs are never hardcoded by the CLI.
 
 `product info` creates a product bundle under `<os-temp>/ksp-cli/<uin>/`:
 
 ```text
 product.yml       Product identity, description, and variations
+offer.yml         KSP prices, payments, branch stock, and delivery
 specifications.md Structured specifications supplied by KSP
 marketing.md      KSP/importer presentation with additional product details
 raw.json          Complete untouched response from KSP's product API
