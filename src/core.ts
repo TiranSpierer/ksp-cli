@@ -90,7 +90,7 @@ export async function searchProducts(input: SearchInput): Promise<unknown> {
   return {
     total: result.products_total ?? 0,
     ...(filters ? { applied_filters: filters } : {}),
-    ...(range ? { list_price_range: range } : {}),
+    ...(range ? { reported_list_price_range: range } : {}),
     ...(result.next ? { next_page: result.next } : {}),
     products: uniqueSearchItems(result.items ?? []).map((item) => productCard(item, input.details)),
   };
