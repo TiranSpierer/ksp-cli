@@ -1,104 +1,52 @@
-# ksp-mcp
+# ksp-cli
 
-MCP server for [KSP](https://ksp.co.il) — Israel's electronics retailer. Search products and fetch product details straight from KSP's internal JSON API.
+CLI for searching and inspecting products sold by [KSP Israel](https://ksp.co.il). It reads KSP's live catalog, pricing, availability, variations, specifications, recommendations, and images without an account or API key.
 
 ## Install
 
-Recommended: install [`israel-shopping`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred over MCP for better token efficiency.
+Recommended: install [`israel-shopping`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace.
 
-<details>
-<summary>Claude Code</summary>
-
-Run in terminal:
-```bash
-claude mcp add ksp -s user -- npx -y git+https://github.com/tiranspierer/ksp-mcp.git
-```
-
-</details>
-
-<details>
-<summary>Codex</summary>
-
-Run in terminal:
-```bash
-codex mcp add ksp npx "-y" "git+https://github.com/tiranspierer/ksp-mcp.git"
-```
-
-</details>
-
-<details>
-<summary>Antigravity</summary>
-
-Run in terminal:
-```bash
-agy mcp add ksp -- npx -y git+https://github.com/tiranspierer/ksp-mcp.git
-```
-
-</details>
-
-<details>
-<summary>Manual MCP config</summary>
-
-```json
-{
-  "mcpServers": {
-    "ksp": {
-      "command": "npx",
-      "args": ["-y", "git+https://github.com/tiranspierer/ksp-mcp.git"]
-    }
-  }
-}
-```
-
-</details>
-
----
-
-<details>
-<summary>CLI</summary>
-
-The package also provides `ksp-cli`, generated from the same tool schemas and handlers as the MCP server:
+Run directly:
 
 ```bash
-npx -y git+https://github.com/TiranSpierer/ksp-mcp.git ksp-cli --help
-ksp-cli search-products --query "laptop"
-ksp-cli get-product 407256 --include-specs
+npx -y git+https://github.com/TiranSpierer/ksp-cli.git ksp-cli --help
 ```
 
-</details>
+## Commands
 
-<details>
-<summary>Tools</summary>
+```bash
+ksp-cli search "OLED 65"
+ksp-cli search "טלוויזיה" --list-filters
+ksp-cli search --filter 3158..134 --filter 3158..3387 --all-pages
 
-- **`search_products`** — search by product name (Hebrew or English), or narrow by filters (brand, size, spec, price, …) to list the products in a category — one page, or every page in a single call. Returns names, prices, stock, and links.
-- **`get_filters`** — see the filters available for a search or category (all screen sizes, brands, resolutions, features, …) and how many products match each, so a search can be narrowed precisely.
-- **`get_product`** — full details for one product (by id or URL): price, any active sale/discount price, stock, and size/config options; optionally specs, images, branch availability, delivery options, and similar items — or the entire raw payload untouched.
-- **`get_product_images`** — download all of a product's photos and get their local file paths, ready to open and view.
+ksp-cli product info 403899
+ksp-cli product info 403899 --include-images
+ksp-cli product offer 403899
+ksp-cli product similar 403899
+```
 
-</details>
+`search --list-filters` returns KSP's current filter groups and opaque option IDs. Pass selected IDs back with repeatable `--filter` options. IDs are never hardcoded by the CLI.
 
-<details>
-<summary>How it works</summary>
+`product info` creates a product bundle under `<os-temp>/ksp-cli/<uin>/`:
 
-Talks directly to KSP's internal JSON API — the same one the website uses — so results are fast and structured, with no HTML scraping. Runs locally over stdio; no account, API key, or login required.
+```text
+product.yml       Product identity, description, and variations
+specifications.md Structured specifications supplied by KSP
+marketing.md      KSP/importer presentation with additional product details
+raw.json          Complete untouched response from KSP's product API
+images/           Product images, with --include-images
+```
 
-</details>
+Commands print compact YAML. Product specifications and marketing HTML are converted to Markdown.
 
-<details>
-<summary>Requirements</summary>
+## Requirements
 
 - Node.js 20+
 
-</details>
-
-<details>
-<summary>Local development</summary>
+## Local development
 
 ```bash
-npm install   # auto-builds via prepare
-npm run reload  # rebuild + restart the dev server
+npm install
+npm test
+node dist/cli.js --help
 ```
-
-The `.mcp.json` at the project root registers a `ksp-dev` server pointing at `dist/index.js`.
-
-</details>

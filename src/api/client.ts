@@ -1,7 +1,6 @@
 import net from "node:net";
 import * as cycletls from "cycletls";
 import type { CycleTLSClient } from "cycletls";
-import { log } from "../log.js";
 
 // cycletls ships as CommonJS (`module.exports = initCycleTLS`); under NodeNext
 // the default import can resolve to the module namespace, so normalize it.
@@ -29,26 +28,32 @@ export const KSP_WEB = "https://ksp.co.il/web";
 // treated as retryable below and we rotate profiles across attempts. This is
 // the one place that logic lives, so every call is covered.
 
-// Chrome's HTTP/2 (Akamai) fingerprint — larger window + MASP priority.
-const HTTP2_FINGERPRINT = "1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p";
-
-// Coherent Chrome TLS (JA3) + User-Agent bundles. Rotated across retry attempts
+// Coherent browser TLS (JA3), HTTP/2, and User-Agent bundles. Rotated across retry attempts
 // so one soured fingerprint doesn't sink a request. Add more entries to widen
-// the pool; each must be a *matched* JA3/UA pair captured from a real browser.
+// the pool; every component must describe the same browser family.
 interface Profile {
   ja3: string;
+  http2Fingerprint: string;
   userAgent: string;
 }
 const CHROME_JA3 =
   "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43-27-17513-21,29-23-24,0";
 const PROFILES: Profile[] = [
   {
+    ja3: "771,4865-4867-4866-49195-49199-52393-52392-49196-49200-49162-49161-49171-49172-51-57-47-53-10,0-23-65281-10-11-35-16-5-51-43-13-45-28-21,29-23-24-25-256-257,0",
+    http2Fingerprint: "1:65536;2:0;4:131072;5:16384|12517377|0|m,p,a,s",
+    userAgent:
+      "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:141.0) Gecko/20100101 Firefox/141.0",
+  },
+  {
     ja3: CHROME_JA3,
+    http2Fingerprint: "1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p",
     userAgent:
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   },
   {
     ja3: CHROME_JA3,
+    http2Fingerprint: "1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p",
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
   },
@@ -78,8 +83,7 @@ function backoffDelay(attempt: number, retryAfterSec?: number): number {
 // --- cycletls client lifecycle ---------------------------------------------
 // Lazily spawned on first use and reused for every subsequent request; the Go
 // helper is a *child process*, so it dies with us. `autoExit` registers exit
-// handlers as a backstop; closeClient() is the graceful path (CLI calls it
-// after its one command, the MCP server on shutdown).
+// handlers as a backstop; closeClient() is the graceful path after a command.
 
 let clientPromise: Promise<CycleTLSClient> | null = null;
 
@@ -100,7 +104,6 @@ async function getClient(): Promise<CycleTLSClient> {
   if (!clientPromise) {
     clientPromise = (async () => {
       const port = await freePort();
-      log(`starting cycletls helper on 127.0.0.1:${port}`);
       return initCycleTLS({ port, timeout: TIMEOUT_MS, autoExit: true });
     })();
   }
@@ -136,10 +139,8 @@ function isRetryable(status: number, bodyIsHtml: boolean): boolean {
 }
 
 /**
- * GET a KSP m_action API path and parse the JSON. The single fetch choke point
- * for every tool — retry/backoff on Cloudflare challenges and transient
- * failures lives here once and covers all calls (search, filters, item,
- * all-pages, images).
+ * GET a KSP m_action API path and parse the JSON. Retry/backoff on Cloudflare
+ * challenges and transient failures lives here once and covers every operation.
  */
 export async function kspFetch<T = unknown>(path: string): Promise<T> {
   const url = `${KSP_API}${path}`;
@@ -147,9 +148,6 @@ export async function kspFetch<T = unknown>(path: string): Promise<T> {
   let lastErr: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) log(`retry ${attempt}/${MAX_RETRIES} ${path}`);
-    else log(`GET ${path}`);
-
     const profile = PROFILES[attempt % PROFILES.length];
 
     let status: number;
@@ -157,7 +155,7 @@ export async function kspFetch<T = unknown>(path: string): Promise<T> {
     try {
       const res = await client.get(url, {
         ja3: profile.ja3,
-        http2Fingerprint: HTTP2_FINGERPRINT,
+        http2Fingerprint: profile.http2Fingerprint,
         userAgent: profile.userAgent,
         headers: { ...BASE_HEADERS, Accept: "application/json" },
         responseType: "text",
@@ -227,7 +225,7 @@ export async function fetchBinary(
     try {
       res = await client.get(url, {
         ja3: profile.ja3,
-        http2Fingerprint: HTTP2_FINGERPRINT,
+        http2Fingerprint: profile.http2Fingerprint,
         userAgent: profile.userAgent,
         headers: BASE_HEADERS,
         responseType: "arraybuffer",

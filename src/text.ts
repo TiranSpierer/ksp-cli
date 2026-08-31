@@ -59,7 +59,7 @@ export function priceRangeLabel(min: unknown, max: unknown): string | null {
  * Merge KSP filter ids into a single `..`-joined path. Accepts option ids that
  * already include the category prefix (e.g. "3158..137", "3158..3388"); splits
  * every id on "..", de-dupes segments, and rejoins — so passing option ids
- * verbatim from get_filters just works, and the shared category id collapses.
+ * verbatim from `search --list-filters` just works and shared prefixes collapse.
  */
 export function mergeFilterIds(ids: string[] | undefined): string {
   const seg = new Set<string>();

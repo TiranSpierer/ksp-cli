@@ -43,8 +43,7 @@ export async function getItem(uin: string): Promise<KspItemResult> {
 
 /**
  * The entire untouched API response for a single product (the full envelope,
- * not just `result`). Escape hatch for get_product's `include_raw` — we surface
- * exactly what KSP sends, with no field selection or reshaping.
+ * not just `result`). Saved in the product bundle as received from KSP.
  */
 export async function getItemRaw(uin: string): Promise<unknown> {
   return kspFetch<unknown>(`/item/${encodeURIComponent(uin)}`);

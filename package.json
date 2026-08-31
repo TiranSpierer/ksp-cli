@@ -1,14 +1,9 @@
 {
-  "name": "ksp-mcp",
+  "name": "ksp-cli",
   "version": "1.0.0",
-  "description": "MCP server for KSP (ksp.co.il), Israel's electronics retailer — search products and fetch product details",
+  "description": "CLI for searching and inspecting products sold by KSP Israel",
   "type": "module",
-  "main": "dist/index.js",
-  "exports": {
-    ".": "./dist/index.js"
-  },
   "bin": {
-    "ksp-mcp": "dist/index.js",
     "ksp-cli": "dist/cli.js"
   },
   "files": [
@@ -20,17 +15,15 @@
   },
   "scripts": {
     "prebuild": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
-    "build": "node ./node_modules/typescript/bin/tsc && node -e \"['dist/index.js','dist/cli.js'].forEach(f=>require('fs').chmodSync(f,0o755))\"",
-    "reload": "npm run build && pkill -f 'node dist/index.js' || true",
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/cli.js',0o755)\"",
+    "test": "npm run build && node --test tests/*.test.js",
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^14.0.0",
     "cycletls": "^2.0.5",
     "turndown": "^7.2.0",
-    "yaml": "^2.8.3",
-    "zod": "^4.3.6"
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
